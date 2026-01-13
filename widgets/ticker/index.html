@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,37 +5,56 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>EDGE Ticker</title>
 <style>
-  /* ----- Theme & aggressive sizing for 2560×720 ----- */
+  /* ===== Aggressive full-height sizing for 2560×720 EDGE ===== */
   :root{
     --bg:#0b0f14; --fg:#e6edf3; --muted:#cbd5e1;          /* brighter muteds for contrast */
     --up:#22c55e; --down:#ef4444;
 
-    /* Big responsive type for full-height EDGE */
-    /* 720px height → 10–12vh ≈ 72–86px; clamp gives room across layouts */
-    --font: clamp(32px, 11.5vh, 110px);
-    --gap: clamp(18px, 3.2vh, 46px);                      /* spacing between items */
-    --padX: clamp(12px, 2.0vw, 40px);                     /* small horizontal breathing room */
+    /* BIG responsive type:
+       - 52vh ensures at least ~374px on a 720px-high EDGE (≥50% of height)
+       - 15vw caps size if the tape gets too wide relative to width
+       - clamp gives a floor/ceiling for other contexts
+    */
+    --font: clamp(120px, min(52vh, 15vw), 420px);
+
+    /* tighter horizontal spacing and no vertical padding */
+    --gap: clamp(14px, 2.4vh, 40px);
+    --padX: clamp(8px, 1.6vw, 36px);
 
     /* Auto-updated by JS based on content width */
     --duration: 55s;
   }
 
-  /* Fill the entire iframe (iCUE widget) with no extra space */
-  html, body { height:100%; width:100%; margin:0; overflow:hidden;
-               background:var(--bg); color:var(--fg);
-               font: var(--font)/1.15 ui-sans-serif, system-ui, Segoe UI, Roboto, Arial; }
+  /* Fill the entire iframe (iCUE widget) with ZERO extra vertical space */
+  html, body {
+    height:100%; width:100%; margin:0; overflow:hidden;
+    background:var(--bg); color:var(--fg);
+    font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Arial;
+    font-size: var(--font);
+    line-height: 1;                /* no extra vertical space */
+  }
 
-  /* Full-bleed ticker row; NO vertical padding */
-  .wrap { height:100%; display:flex; align-items:center; justify-content:flex-start; white-space:nowrap; }
-  .ticker { display:inline-flex; gap:var(--gap); padding:0 var(--padX);
-            animation:scroll var(--duration) linear infinite; }
+  .wrap {
+    height:100%;
+    display:flex;
+    align-items:center;            /* vertically center the row in the widget */
+    justify-content:flex-start;
+    white-space:nowrap;
+  }
 
-  .item { display:inline-flex; gap:0.6em; align-items:baseline }
-  .sym  { font-weight:800; color:var(--muted); letter-spacing:.3px }
-  .px   { font-weight:700 }
+  .ticker {
+    display:inline-flex;
+    gap:var(--gap);
+    padding:0 var(--padX);         /* horizontal breathing room only */
+    animation:scroll var(--duration) linear infinite;
+  }
+
+  .item { display:inline-flex; gap:0.55em; align-items:center }
+  .sym  { font-weight:800; color:var(--muted); letter-spacing:.02em }
+  .px   { font-weight:800 }
   .chg.up   { color:var(--up) }
   .chg.down { color:var(--down) }
-  .sep  { color:#233142 } /* thin separator dot */
+  .sep  { color:#233142; transform: translateY(-3%); }  /* tiny visual balance */
 
   @keyframes scroll { from{ transform:translateX(0) } to{ transform:translateX(-50%) } }
   .paused { animation-play-state:paused }
@@ -54,8 +72,8 @@
   try {
     const u = new URL(window.location.href);
     if (!u.searchParams.has('v')) {
-      u.searchParams.set('v', String(Date.now()));        // bust cache
-      window.location.replace(u.toString());              // one-time reload
+      u.searchParams.set('v', String(Date.now()));
+      window.location.replace(u.toString());              // one-time reload with version
     }
   } catch (e) {}
 })();
@@ -82,13 +100,12 @@ async function fetchQuote(sym){
   return { sym, price, change, pct };
 }
 
-/* Build one pass and duplicate for infinite marquee */
 async function refresh(){
   const results = [];
   for (const s of SYMBOLS){
     try { results.push(await fetchQuote(s)); }
     catch(e){ results.push({ sym:s, price:0, change:0, pct:0 }); }
-    await new Promise(r=>setTimeout(r, 250));            // stay well below Finnhub 60 calls/min limit
+    await new Promise(r=>setTimeout(r, 250));            // stay well below Finnhub 60 calls/min
   }
 
   const parts = results.map(r=>{
@@ -113,7 +130,8 @@ async function refresh(){
   document.body.removeChild(temp);
 
   const vw = window.innerWidth;
-  const pxPerSecond = Math.max(80, Math.min(170, vw / 16)); // aggressive speed curve for big type
+  /* With much larger fonts, nudge speed up so the tape still flows smoothly */
+  const pxPerSecond = Math.max(90, Math.min(190, vw / 15));
   const durationSec  = (contentWidth + vw) / pxPerSecond;
   document.documentElement.style.setProperty("--duration", `${durationSec.toFixed(2)}s`);
 }
@@ -139,7 +157,7 @@ window.addEventListener("resize", ()=>{
   document.body.removeChild(t);
 
   const vw = window.innerWidth;
-  const s = Math.max(80, Math.min(170, vw / 16));
+  const s = Math.max(90, Math.min(190, vw / 15));
   const d = (w + vw) / s;
   document.documentElement.style.setProperty("--duration", `${d.toFixed(2)}s`);
 });
