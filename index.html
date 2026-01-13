@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Classic Stock Ticker</title>
+<style>
+  :root{
+    --bg:#0b0f14; --fg:#e6edf3; --muted:#94a3b8; --up:#22c55e; --down:#ef4444;
+    --gap:28px; --speed:55s; --font:16px/1.35 ui-sans-serif, system-ui, Segoe UI, Roboto, Arial;
+  }
+  html,body{margin:0;background:var(--bg);color:var(--fg);font:var(--font)}
+  .bar{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1f2937;padding:8px 14px}
+  .title{font-weight:600;color:var(--muted)} .meta{color:#6b7280;font-size:13px}
+  .wrap{overflow:hidden;white-space:nowrap; user-select:none}
+  .ticker{display:inline-flex;gap:var(--gap);padding:12px 18px;animation:scroll var(--speed) linear infinite}
+  .item{display:inline-flex;gap:10px;align-items:baseline}
+  .sym{font-weight:700;color:var(--muted);letter-spacing:.3px}
+  .px{font-weight:600}
+  .chg.up{color:var(--up)} .chg.down{color:var(--down)}
+  .sep{color:#233142}
+  @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .paused{animation-play-state:paused}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="title">Market Ticker</div>
+    <div class="meta" id="meta">Updated: — | tap to pause / resume</div>
+  </div>
+
+  <div class="wrap" id="wrap">
+    <div class="ticker" id="ticker"></div>
+  </div>
+
+<script>
+/* ===== CONFIG ===== */
+const SYMBOLS = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AMD","NFLX","CRM"]; // edit as you like
+const FINNHUB_TOKEN = "d5ir5q9r01qicq2kb2r0d5ir5q9r01qicq2kb2rg"; // <-- paste your key here
+const REFRESH_MS = 15 * 60 * 1000;          // refresh every 15 minutes
+const BASE = s => `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(s)}&token=${FINNHUB_TOKEN}`;
+
+/* ===== FETCH & RENDER ===== */
+async function fetchQuote(sym){
+  const r = await fetch(BASE(sym));
+  const q = await r.json();
+  // Finnhub fields: c=current, d=change, dp=change %, pc=previous close
+  const price = Number(q.c ?? 0);
+  let change = Number(q.d ?? 0);
+  let pct = Number(q.dp ?? 0);
+  if (!Number.isFinite(pct) && Number.isFinite(q.pc) && q.pc !== 0) {
+    change = price - q.pc;
+    pct = (change / q.pc) * 100;
+  }
+  return { sym, price, change, pct };
+}
+
+async function refresh(){
+  const results = [];
+  for (const s of SYMBOLS){
+    try { results.push(await fetchQuote(s)); }
+    catch(e){ results.push({ sym:s, price:0, change:0, pct:0 }); }
+    await new Promise(res=>setTimeout(res, 250)); // pacing (<60 calls/min)
+  }
+  const items = results.map(r=>{
+    const dir = r.change >= 0 ? "up" : "down";
+    return `<div class="item">
+      <span class="sym">${r.sym}</span>
+      <span class="px">$${r.price.toFixed(2)}</span>
+      <span class="chg ${dir}">${r.change>=0?"+":"-"}${Math.abs(r.change).toFixed(2)} (${r.pct.toFixed(2)}%)</span>
+    </div><span class="sep">•</span>`;
+  });
+  const html = items.join("");
+  const el = document.getElementById("ticker");
+  el.innerHTML = html + html; // duplicate for seamless marquee
+  document.getElementById("meta").textContent = "Updated: " + new Date().toLocaleTimeString();
+}
+
+// tap to pause/resume
+document.getElementById("wrap").addEventListener("click", ()=>{
+  document.getElementById("ticker").classList.toggle("paused");
+});
+
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
